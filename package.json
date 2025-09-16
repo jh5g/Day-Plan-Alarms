@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "Day-Plan-Alarms",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "This sets alarms from times in specified",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

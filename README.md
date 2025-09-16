@@ -1,4 +1,9 @@
-# Obsidian Sample Plugin
+# Alarm Plug in
+To do:
+- [X] Works with 24 hour and 12 hour time
+- [ ] Check for existing alarms
+- [ ] Custom sounds 
+## Obsidian Sample Plugin Information
 
 This is a sample plugin for Obsidian (https://obsidian.md).
 
@@ -12,7 +17,7 @@ This sample plugin demonstrates some of the basic functionality the plugin API c
 - Registers a global click event and output 'click' to the console.
 - Registers a global interval which logs 'setInterval' to the console.
 
-## First time developing plugins?
+### First time developing plugins?
 
 Quick starting guide for new plugin devs:
 
@@ -26,7 +31,7 @@ Quick starting guide for new plugin devs:
 - Enable plugin in settings window.
 - For updates to the Obsidian API run `npm update` in the command line under your repo folder.
 
-## Releasing new releases
+### Releasing new releases
 
 - Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
 - Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
@@ -37,25 +42,25 @@ Quick starting guide for new plugin devs:
 > You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
 > The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
 
-## Adding your plugin to the community plugin list
+### Adding your plugin to the community plugin list
 
 - Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
 - Publish an initial version.
 - Make sure you have a `README.md` file in the root of your repo.
 - Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
 
-## How to use
+### How to use
 
 - Clone this repo.
 - Make sure your NodeJS is at least v16 (`node --version`).
 - `npm i` or `yarn` to install dependencies.
 - `npm run dev` to start compilation in watch mode.
 
-## Manually installing the plugin
+### Manually installing the plugin
 
 - Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
 
-## Improve code quality with eslint (optional)
+### Improve code quality with eslint (optional)
 - [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
 - To use eslint with this project, make sure to install eslint from terminal:
   - `npm install -g eslint`
@@ -65,7 +70,7 @@ Quick starting guide for new plugin devs:
 - If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
   - `eslint ./src/`
 
-## Funding URL
+### Funding URL
 
 You can include funding URLs where people who use your plugin can financially support it.
 
