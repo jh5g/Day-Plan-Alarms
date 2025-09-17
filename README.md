@@ -1,8 +1,10 @@
 # Alarm Plug in
 To do:
 - [X] Works with 24 hour and 12 hour time
-- [ ] Check for existing alarms
 - [X] Custom sounds
+- [ ] Running List of 
+- [ ] Check for existing alarms
+- [ ] Cancel alarms from a list in settings and also when you run the extraction
 
 Note that this plugin uses sounds from Mixkit.
 ## Obsidian Sample Plugin Information
