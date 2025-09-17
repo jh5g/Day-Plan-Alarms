@@ -2,7 +2,9 @@
 To do:
 - [X] Works with 24 hour and 12 hour time
 - [ ] Check for existing alarms
-- [ ] Custom sounds 
+- [X] Custom sounds
+
+Note that this plugin uses sounds from Mixkit.
 ## Obsidian Sample Plugin Information
 
 This is a sample plugin for Obsidian (https://obsidian.md).
