@@ -1,20 +1,25 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import * as path from "path";
+import * as fs from "fs";
 
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
-	mySetting: string;
+	 alarmFile: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	alarmFile: "mixkit-vintage-warning-alarm-990.wav"
 }
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
 	private currentAlarm: HTMLAudioElement | null = null;
+
 	async onload() {
+		await this.loadSettings();
+        this.addSettingTab(new DayPlanAlarmsSettingsTab(this.app, this));
         this.addCommand({
             id: "schedule-alarms",
             name: "Schedule alarms in Active Note",
@@ -78,20 +83,21 @@ export default class MyPlugin extends Plugin {
 		const delay = target.getTime() - now.getTime();
 
 		setTimeout(() => {
-			this.playAlarm();
+			this.playAlarm(false);
 			new AlarmModal(this.app, this).open();
 		}, delay);
 
 		console.log(`Alarm set for ${timeStr} (${delay / 1000} seconds from now)`);
     }
 
-	playAlarm() {
+	playAlarm(testing: boolean) {
 		// Path relative to plugin install directory
-		const path = this.app.vault.adapter.getResourcePath(`${this.app.vault.configDir}/plugins/${this.manifest.id}/mixkit-vintage-warning-alarm-990.wav`);
+		const path = this.app.vault.adapter.getResourcePath(this.app.vault.configDir +'/plugins/' + this.manifest.id + '/' + this.settings.alarmFile);
 		console.log(path);
 
 		const audio = new Audio(path);
 		audio.loop = true;
+		
 		audio.play();
 
 		this.currentAlarm = audio;
@@ -106,6 +112,14 @@ export default class MyPlugin extends Plugin {
 			new Notice("✅ Alarm dismissed");
 		}
 	}
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }	
 }
 class AlarmModal extends Modal {
     plugin: MyPlugin;
@@ -130,3 +144,47 @@ class AlarmModal extends Modal {
         contentEl.empty();
     }
 }
+
+class DayPlanAlarmsSettingsTab extends PluginSettingTab{
+	plugin: MyPlugin;
+	alarmFile: string; // just the filename
+
+	constructor(app: App, plugin: MyPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const {containerEl} = this;
+
+		containerEl.empty();
+		containerEl.createEl("h2", { text: "Day Plan Alarms Settings" });
+
+		 // Grab all files in the plugin folder
+		const fs = require("fs");
+		console.log(this.plugin.manifest.dir);
+        const pathLoc = path.join(
+			(this.app.vault.adapter as any).basePath,
+			".obsidian",
+			"plugins",
+			this.plugin.manifest.id
+    	);
+        const files: string[] = fs.readdirSync(pathLoc)
+   			.filter((f: string) => f.match(/\.(wav|mp3|ogg)$/i)) as string[];
+
+		console.log(files); 
+		console.log(pathLoc); 
+		new Setting(containerEl)
+			.setName('Sound File')
+			.setDesc('Choose Sound FIle')
+ 			.addDropdown(drop => {
+                files.forEach(file => drop.addOption(file, file));
+                drop.setValue(this.plugin.settings.alarmFile);
+                drop.onChange(async value => {
+                    this.plugin.settings.alarmFile = value;
+                    await this.plugin.saveSettings();
+                });
+			});
+    }
+}
+		
