@@ -14,8 +14,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
-
 	private currentAlarm: HTMLAudioElement | null = null;
+	public scheduledAlarms: { timeoutId: ReturnType<typeof setTimeout>, timeStr: string }[] = [];
 
 	async onload() {
 		await this.loadSettings();
@@ -31,25 +31,27 @@ export default class MyPlugin extends Plugin {
 	onunload() {
         console.log("Unloading Alarm Plugin");
 	}
-    async scheduleAlarms() {
-        const file = this.app.workspace.getActiveFile();
-        if (!file) return;
+	async scheduleAlarms() {
+		// Cancel all existing alarms before scheduling new ones
+		this.cancelAllAlarms();
+		const file = this.app.workspace.getActiveFile();
+		if (!file) return;
 
-        const content = await this.app.vault.read(file);
+		const content = await this.app.vault.read(file);
 
-        // Step 1: Extract times from the markdown
-        const times = this.extractTimes(content);
+		// Step 1: Extract times from the markdown
+		const times = this.extractTimes(content);
 
-        // Step 2: Schedule alarms
+		// Step 2: Schedule alarms
 		times.forEach((time) => this.setAlarm(time));
-    }
+	}
 
 	extractTimes(content: string): string[] {
 		const regex = /\b((?:[01]?\d|2[0-3]):[0-5]\d(?:\s?(?:AM|PM))?)\b/gi;
 		return [...content.matchAll(regex)].map(match => match[1]);
 	}
 
-    setAlarm(timeStr: string) {
+	setAlarm(timeStr: string) {
 		const now = new Date();
 		const target = new Date();
 
@@ -80,14 +82,36 @@ export default class MyPlugin extends Plugin {
 			return;
 		}
 
+		// Prevent duplicate alarms for the same time
+		if (this.scheduledAlarms.some(a => a.timeStr === timeStr)) {
+			console.log(`Alarm for ${timeStr} already scheduled. Skipping duplicate.`);
+			return;
+		}
+
 		const delay = target.getTime() - now.getTime();
 
-		setTimeout(() => {
+		const timeoutId = setTimeout(() => {
 			this.playAlarm(false);
 			new AlarmModal(this.app, this).open();
+			// Remove this alarm from scheduledAlarms after it fires
+			this.scheduledAlarms = this.scheduledAlarms.filter(a => a.timeoutId !== timeoutId);
 		}, delay);
 
+		this.scheduledAlarms.push({ timeoutId, timeStr });
 		console.log(`Alarm set for ${timeStr} (${delay / 1000} seconds from now)`);
+	}
+
+	   public cancelAllAlarms() {
+		   this.scheduledAlarms.forEach(({ timeoutId }) => clearTimeout(timeoutId));
+		   this.scheduledAlarms = [];
+		   console.log("All pending alarms cancelled.");
+	   }
+
+	   public cancelAlarmByIndex(idx: number) {
+		   if (this.scheduledAlarms[idx]) {
+			   clearTimeout(this.scheduledAlarms[idx].timeoutId);
+			   this.scheduledAlarms.splice(idx, 1);
+		   }
     }
 
 	playAlarm(testing: boolean) {
@@ -160,31 +184,50 @@ class DayPlanAlarmsSettingsTab extends PluginSettingTab{
 		containerEl.empty();
 		containerEl.createEl("h2", { text: "Day Plan Alarms Settings" });
 
-		 // Grab all files in the plugin folder
+		// Sound file selection
 		const fs = require("fs");
-		console.log(this.plugin.manifest.dir);
-        const pathLoc = path.join(
+		const pathLoc = path.join(
 			(this.app.vault.adapter as any).basePath,
 			".obsidian",
 			"plugins",
 			this.plugin.manifest.id
-    	);
-        const files: string[] = fs.readdirSync(pathLoc)
-   			.filter((f: string) => f.match(/\.(wav|mp3|ogg)$/i)) as string[];
+		);
+		const files: string[] = fs.readdirSync(pathLoc)
+			.filter((f: string) => f.match(/\.(wav|mp3|ogg)$/i)) as string[];
 
-		console.log(files); 
-		console.log(pathLoc); 
 		new Setting(containerEl)
 			.setName('Sound File')
-			.setDesc('Choose Sound FIle')
- 			.addDropdown(drop => {
-                files.forEach(file => drop.addOption(file, file));
-                drop.setValue(this.plugin.settings.alarmFile);
-                drop.onChange(async value => {
-                    this.plugin.settings.alarmFile = value;
-                    await this.plugin.saveSettings();
-                });
+			.setDesc('Choose Sound File')
+			.addDropdown(drop => {
+				files.forEach(file => drop.addOption(file, file));
+				drop.setValue(this.plugin.settings.alarmFile);
+				drop.onChange(async value => {
+					this.plugin.settings.alarmFile = value;
+					await this.plugin.saveSettings();
+				});
 			});
-    }
+
+		// Pending alarms management
+		containerEl.createEl("h3", { text: "Pending Alarms" });
+		if (this.plugin.scheduledAlarms.length === 0) {
+			containerEl.createEl("div", { text: "No pending alarms." });
+		} else {
+			this.plugin.scheduledAlarms.forEach((alarm, idx) => {
+				const alarmDiv = containerEl.createDiv();
+				alarmDiv.createSpan({ text: `Alarm for: ${alarm.timeStr}` });
+				const cancelBtn = alarmDiv.createEl("button", { text: "Cancel" });
+				cancelBtn.onclick = () => {
+					this.plugin.cancelAlarmByIndex(idx);
+					this.display(); // Refresh UI
+				};
+			});
+			// Cancel all button
+			const cancelAllBtn = containerEl.createEl("button", { text: "Cancel All Alarms" });
+			cancelAllBtn.onclick = () => {
+				this.plugin.cancelAllAlarms();
+				this.display();
+			};
+		}
+	}
 }
 		
