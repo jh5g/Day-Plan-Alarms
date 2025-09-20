@@ -5,9 +5,9 @@ To do:
 - [X] Running List of 
 - [X] Check for existing alarms
 - [X] Cancel alarms from a list in settings and also when you run the extraction
-- [ ] Sidebar Window that mimics settings panel
+- [X] Sidebar Window that mimics settings panel
   - [X] Remove from sidebar window when they play
-- [ ] Check for duplicate alarms in different time format
+- [X] Check for duplicate alarms in different time format
 
 Note that this plugin uses sounds from Mixkit.
 ## Obsidian Sample Plugin Information
