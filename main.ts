@@ -1,4 +1,5 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf } from 'obsidian';
+import { AlarmPanelView, ALARM_PANEL_VIEW_TYPE } from "./ui/AlarmPanelView2";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -19,14 +20,23 @@ export default class MyPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-        this.addSettingTab(new DayPlanAlarmsSettingsTab(this.app, this));
-        this.addCommand({
-            id: "schedule-alarms",
-            name: "Schedule alarms in Active Note",
+		this.addSettingTab(new DayPlanAlarmsSettingsTab(this.app, this));
+		this.addCommand({
+			id: "schedule-alarms",
+			name: "Schedule alarms in Active Note",
 			callback: () => this.scheduleAlarms(),
 		});
 		console.log('Added Command Schedule Alarms in Active Note');
+
+		this.registerView(ALARM_PANEL_VIEW_TYPE, (leaf) => new AlarmPanelView(leaf, this));
+		this.addCommand({
+			id: "open-alarm-panel",
+			name: "Show Alarm Panel",
+			callback: () => this.activateAlarmPanel(),
+		});
+		console.log('Added Command Show Alarm Panel');
 	}
+
 
 	onunload() {
         console.log("Unloading Alarm Plugin");
@@ -44,6 +54,38 @@ export default class MyPlugin extends Plugin {
 
 		// Step 2: Schedule alarms
 		times.forEach((time) => this.setAlarm(time));
+		this.triggerAlarmUpdate();
+
+		// Show notice with all scheduled alarms in 12-hour format
+		if (this.scheduledAlarms.length > 0) {
+			const formatted = this.scheduledAlarms
+				.map(a => this.formatTime12Hour(a.timeStr))
+				.join(", ");
+			new Notice("Alarms set for: " + formatted);
+		} else {
+			new Notice("No alarms set.");
+		}
+	}
+	// Helper to normalize a time string to 12-hour format (e.g., 2:05 PM)
+	formatTime12Hour(timeStr: string): string {
+		let hours: number, minutes: number;
+		const match = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
+		if (match) {
+			hours = parseInt(match[1], 10);
+			minutes = parseInt(match[2], 10);
+			const ampm = match[3].toUpperCase();
+			if (ampm === "PM" && hours < 12) hours += 12;
+			if (ampm === "AM" && hours === 12) hours = 0;
+		} else {
+			const [h, m] = timeStr.split(":").map(Number);
+			hours = h;
+			minutes = m;
+		}
+		// Convert to 12-hour format
+		const ampm = hours >= 12 ? "PM" : "AM";
+		let displayHour = hours % 12;
+		if (displayHour === 0) displayHour = 12;
+		return `${displayHour}:${minutes.toString().padStart(2, "0")} ${ampm}`;
 	}
 
 	extractTimes(content: string): string[] {
@@ -82,9 +124,26 @@ export default class MyPlugin extends Plugin {
 			return;
 		}
 
-		// Prevent duplicate alarms for the same time
-		if (this.scheduledAlarms.some(a => a.timeStr === timeStr)) {
-			console.log(`Alarm for ${timeStr} already scheduled. Skipping duplicate.`);
+		// Prevent duplicate alarms for the same logical time (regardless of format)
+		const isDuplicate = this.scheduledAlarms.some(a => {
+			// Parse a.timeStr to hours/minutes
+			let ah = 0, am = 0;
+			const amatch = a.timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
+			if (amatch) {
+				ah = parseInt(amatch[1], 10);
+				am = parseInt(amatch[2], 10);
+				const ap = amatch[3].toUpperCase();
+				if (ap === "PM" && ah < 12) ah += 12;
+				if (ap === "AM" && ah === 12) ah = 0;
+			} else {
+				const [h, m] = a.timeStr.split(":").map(Number);
+				ah = h;
+				am = m;
+			}
+			return ah === hours && am === minutes;
+		});
+		if (isDuplicate) {
+			console.log(`Alarm for ${timeStr} already scheduled (duplicate time). Skipping duplicate.`);
 			return;
 		}
 
@@ -95,24 +154,44 @@ export default class MyPlugin extends Plugin {
 			new AlarmModal(this.app, this).open();
 			// Remove this alarm from scheduledAlarms after it fires
 			this.scheduledAlarms = this.scheduledAlarms.filter(a => a.timeoutId !== timeoutId);
+			this.triggerAlarmUpdate();
 		}, delay);
 
-		this.scheduledAlarms.push({ timeoutId, timeStr });
-		console.log(`Alarm set for ${timeStr} (${delay / 1000} seconds from now)`);
+	this.scheduledAlarms.push({ timeoutId, timeStr });
+	console.log(`Alarm set for ${timeStr} (${delay / 1000} seconds from now)`);
+	this.triggerAlarmUpdate();
 	}
 
 	   public cancelAllAlarms() {
 		   this.scheduledAlarms.forEach(({ timeoutId }) => clearTimeout(timeoutId));
 		   this.scheduledAlarms = [];
 		   console.log("All pending alarms cancelled.");
+		   this.triggerAlarmUpdate();
 	   }
 
 	   public cancelAlarmByIndex(idx: number) {
 		   if (this.scheduledAlarms[idx]) {
 			   clearTimeout(this.scheduledAlarms[idx].timeoutId);
 			   this.scheduledAlarms.splice(idx, 1);
+			   this.triggerAlarmUpdate();
 		   }
-    }
+	   }
+
+	   triggerAlarmUpdate() {
+		   window.dispatchEvent(new Event("alarm-updated"));
+	   }
+
+	   async activateAlarmPanel() {
+		   let leaf = this.app.workspace.getLeavesOfType(ALARM_PANEL_VIEW_TYPE)[0];
+		   if (!leaf) {
+			   leaf = this.app.workspace.getRightLeaf(false) as WorkspaceLeaf;
+			   await leaf.setViewState({ type: ALARM_PANEL_VIEW_TYPE, active: true });
+		   } else {
+			   this.app.workspace.revealLeaf(leaf);
+		   }
+		   // Always refresh alarms when opening
+		   this.triggerAlarmUpdate();
+	   }
 
 	playAlarm(testing: boolean) {
 		// Path relative to plugin install directory
@@ -163,9 +242,10 @@ class AlarmModal extends Modal {
         });
     }
 
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+		this.plugin.stopAlarm();
     }
 }
 
